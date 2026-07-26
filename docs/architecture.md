@@ -115,12 +115,34 @@ existing ReID features with no extra compute.
 
 ### ReID — OSNet-AIN x1.0
 
-| Model | Params | GPU / batch-8 | Cross-domain | Verdict |
-|---|---|---|---|---|
-| **osnet_ain_x1_0** | 2.2 M | ~4 ms | Strong (instance-norm architecture search, built for domain shift) | Chosen |
-| osnet_x1_0 | 2.2 M | ~4 ms | Good | Fallback |
-| FastReID R50-ibn | 25 M | ~12 ms | Very strong | Heavier + Windows build friction; add later as a second backend |
-| TransReID / CLIP-ReID | 86 M+ | ~45 ms | Best | Kills real-time multi-camera on a 4050 |
+| Model | Params | Cross-domain | Verdict |
+|---|---|---|---|
+| **osnet_ain_x1_0** | 2.17 M | Strong (instance-norm architecture search, built for domain shift) | Chosen |
+| osnet_x1_0 | 2.2 M | Good | Fallback |
+| FastReID R50-ibn | 25 M | Very strong | Heavier + Windows build friction; add later as a second backend |
+| TransReID / CLIP-ReID | 86 M+ | Best | Kills real-time multi-camera on a 4050 |
+
+⚠️ **Measured latency, correcting an earlier estimate.** This table originally
+predicted ~4 ms for a batch of 8. The measured figure on the RTX 4050 is **~21 ms,
+and it is flat in batch size** — 1 crop costs the same as 16. OSNet's parameter
+efficiency comes from many small operations (151 Conv2d and 79 normalisation layers
+across 478 modules), so it is entirely **kernel-launch-bound**, not compute-bound,
+and Windows' WDDM driver makes each launch expensive.
+
+Three consequences, all load-bearing:
+
+* **Always batch.** Marginal cost is ~0.05 ms per additional crop, so embedding
+  every person in a frame together is effectively free.
+* **FP16 buys nothing here** (20.4 ms vs 20.0 ms). Harmless, left enabled.
+* **A smaller OSNet variant would not help.** `osnet_x0_25` has the same number of
+  layers, only narrower ones — same launch count, same floor. Worth knowing before
+  anyone spends time on it.
+
+The designed mitigation is what makes this fine: per-track temporal sampling
+(`reid_interval_frames: 10`, dropping to `locked_reid_interval_frames: 60` once an
+identity is locked) amortises 21 ms across ten frames — about 2 ms per frame.
+Beyond that, the real fixes are CUDA graphs or an ONNX Runtime backend, both of
+which collapse launch overhead; both are deferred until measurement says they matter.
 
 Given R4, a domain-generalisable 2.2M-parameter model beats a benchmark champion
 that overfits its training domain. It also leaves ~4 GB VRAM for multiple streams.
@@ -225,8 +247,8 @@ Per 720p frame, single camera, RTX 4050:
 | Decode | 3–6 ms | Capture thread, `CAP_PROP_BUFFERSIZE=1`, `rtsp_transport=tcp`, `q(1)` (R3) |
 | YOLOv11s | 6–8 ms | FP16, `inference_mode`, `channels_last`, `cudnn.benchmark`, warm-up |
 | ByteTrack | ~1 ms | CPU |
-| Quality gate | <1 ms | Rejects crops before they cost GPU time |
-| OSNet (batched) | 3–5 ms | One forward per frame; per-track sampling, near-zero once locked |
+| Quality gate | ~1 ms | Rejects crops before they cost GPU time |
+| OSNet (batched) | ~21 ms per call, **amortised ~2 ms** | Flat in batch size; per-track sampling every 10th frame, every 60th once locked |
 | Index search | <0.5 ms | Exact, microseconds at our scale |
 | Annotate + encode | 3–5 ms | Separate thread, downscaled JPEG for the browser |
 

@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 import structlog
 
-from mcmot.core.container import Container
+from mcmot.container import Container
 from mcmot.core.device import DeviceManager
 from mcmot.core.errors import ConfigError, DeviceError
 from mcmot.core.settings import Settings, load_settings

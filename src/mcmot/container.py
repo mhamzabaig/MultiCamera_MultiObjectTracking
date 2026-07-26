@@ -1,5 +1,13 @@
 """Application container: composition root and dependency provider.
 
+Deliberately at the package root rather than inside :mod:`mcmot.core`. The container
+imports from every feature package — storage, detection, tracking, reid — while those
+packages import from ``core``. Placing it in ``core`` created an import cycle that
+only manifested depending on which module a process imported first: ``core.device``
+would trigger ``core/__init__``, which imported the container, which imported
+``reid``, which imported ``core.device`` again. The composition root belongs *above*
+the layers it wires together, not inside the lowest one.
+
 Why a hand-written container rather than a DI framework: the object graph here is
 small and known at build time. A framework would add magic, a decorator
 vocabulary, and a debugging surface for no benefit. What we need is one place
@@ -30,6 +38,7 @@ from mcmot.core.device import DeviceManager
 from mcmot.core.logging import configure_logging, get_logger
 from mcmot.core.settings import Settings, load_settings
 from mcmot.detection import BaseDetector, create_detector
+from mcmot.reid import BaseEmbedder, QualityGate, create_embedder
 from mcmot.storage.blobs import BlobStore
 from mcmot.storage.db import Database
 from mcmot.storage.repository import PersonRepository
@@ -96,6 +105,22 @@ class Container:
         detector = create_detector(self._settings.detector, self.device_manager)
         detector.warmup()
         return detector
+
+    @cached_property
+    def embedder(self) -> BaseEmbedder:
+        """ReID embedder, shared by every camera pipeline.
+
+        Safe to share: unlike the tracker it holds no per-stream state. Built lazily
+        so a machine without model weights can still run the API and the tests.
+        """
+        embedder = create_embedder(self._settings.reid, self.device_manager)
+        embedder.warmup()
+        return embedder
+
+    @cached_property
+    def quality_gate(self) -> QualityGate:
+        """Crop quality gate, shared by registration and tracking alike."""
+        return QualityGate(self._settings.reid.quality)
 
     def create_tracker(self) -> BaseTracker:
         """Build a tracker for one camera.

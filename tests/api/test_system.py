@@ -18,7 +18,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from mcmot.api.middleware import REQUEST_ID_HEADER
-from mcmot.core.container import Container
+from mcmot.container import Container
 from mcmot.core.errors import CameraDisconnectedError, PersonNotFoundError
 from mcmot.core.settings import load_settings
 from mcmot.main import create_app

@@ -13,12 +13,13 @@ Video stream → YOLOv11 → ByteTrack → crop → OSNet ReID → Identity Serv
 
 ## Status
 
-**Phases 1–4 of 12 complete.** Foundation (configuration, structured logging,
+**Phases 1–5 of 12 complete.** Foundation (configuration, structured logging,
 exception hierarchy, device management, domain contracts, DI container, API
 skeleton), storage (SQLite, `PersonRepository`, FAISS gallery index, image store),
-detection (YOLOv11n on CUDA — 72 FPS at 720p on an RTX 4050), and tracking
-(ByteTrack — 57 FPS detect-and-track end to end). ReID, the identity service, and
-the UI arrive in later phases; see [docs/roadmap.md](docs/roadmap.md).
+detection (YOLOv11n on CUDA — 72 FPS at 720p on an RTX 4050), tracking (ByteTrack —
+57 FPS detect-and-track end to end), and re-identification (OSNet-AIN — same person
+scores 0.97 mean, different people 0.43). The identity service and the UI arrive in
+later phases; see [docs/roadmap.md](docs/roadmap.md).
 
 ## Requirements
 
@@ -33,7 +34,7 @@ the UI arrive in later phases; see [docs/roadmap.md](docs/roadmap.md).
 .\scripts\setup_env.ps1 -WithStorage -WithTorch -WithMl
 .\.venv\Scripts\Activate.ps1
 python scripts\init_db.py              # create the schema and an empty index
-python scripts\download_models.py      # fetch yolo11n.pt
+python scripts\download_models.py      # fetch yolo11n.pt + osnet_ain_x1_0.pth
 python scripts\smoke_check.py          # verify config, logging, device, API
 ```
 
@@ -93,11 +94,13 @@ mypy
 
 | Path | Contents |
 |---|---|
-| `src/mcmot/core/` | Config, logging, errors, device, DI container |
+| `src/mcmot/core/` | Config, logging, errors, device. Imports nothing from the layers above |
 | `src/mcmot/domain/` | Shared dataclasses (`BBox`, `Detection`, `Track`, `IdentityVerdict`) |
 | `src/mcmot/storage/` | SQLite schema, repository, FAISS index, image store |
 | `src/mcmot/detection/` | `BaseDetector` interface and the YOLOv11 implementation |
 | `src/mcmot/tracking/` | `BaseTracker` interface and the ByteTrack implementation |
+| `src/mcmot/reid/` | `BaseEmbedder`, OSNet-AIN (vendored), and the crop quality gate |
+| `src/mcmot/container.py` | Composition root — wires every layer together |
 | `src/mcmot/api/` | Routers, schemas, dependencies, middleware, error mapping |
 | `config/` | `default.yaml` (committed) and `local.yaml` (yours) |
 | `data/` `models/` `logs/` | Generated at runtime, never committed |

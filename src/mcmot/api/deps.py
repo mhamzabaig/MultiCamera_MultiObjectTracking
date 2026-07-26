@@ -12,7 +12,7 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
-from mcmot.core.container import Container
+from mcmot.container import Container
 from mcmot.core.settings import Settings
 
 __all__ = ["ContainerDep", "SettingsDep", "get_container", "get_settings"]

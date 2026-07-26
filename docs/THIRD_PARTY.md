@@ -30,12 +30,30 @@
 
 | Component | Origin | Licence | Phase |
 |---|---|---|---|
-| OSNet architecture (`osnet_ain_x1_0`) | [KaiyangZhou/deep-person-reid](https://github.com/KaiyangZhou/deep-person-reid) | MIT | 5 |
+| OSNet-AIN architecture | [KaiyangZhou/deep-person-reid](https://github.com/KaiyangZhou/deep-person-reid) | MIT | 5 |
 
 Vendored rather than installed: the `torchreid` package builds a Cython evaluation
-extension that routinely fails on Windows, and only the model definition is
-needed. The file is copied verbatim with its copyright header intact; pretrained
-weights are downloaded by `scripts/download_models.py`.
+extension that routinely fails on Windows, and only the model definition is needed.
+
+`src/mcmot/reid/osnet.py` is the upstream `torchreid/models/osnet_ain.py` with two
+removals — the Google Drive download helper and the three model variants this project
+does not use. The layer definitions are untouched, because they must match the
+pretrained checkpoint exactly; the file was produced by transforming the upstream
+source rather than retyping it, and verified by loading the real checkpoint
+(552/552 tensor names matched). It carries an attribution header, is marked
+`# ruff: noqa` and `# mypy: ignore-errors` so it is not held to this project's
+conventions, and should not be hand-edited.
+
+### Pretrained weights
+
+| Weights | Source | Trained on |
+|---|---|---|
+| `osnet_ain_x1_0.pth` (16.5 MB) | [huggingface.co/kaiyangzhou/osnet](https://huggingface.co/kaiyangzhou/osnet) — the author's own account | MSMT17 |
+
+Chosen over the torchreid model zoo, which distributes via Google Drive: that would
+require an extra dependency (`gdown`), rate-limits unpredictably, and cannot be
+resumed. The Hugging Face mirror is plain HTTPS and supports range requests, so
+`scripts/download_models.py` needs no special handling.
 
 ## Development
 

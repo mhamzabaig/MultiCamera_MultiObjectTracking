@@ -21,7 +21,7 @@ from fastapi.responses import JSONResponse
 from mcmot.api.errors import register_exception_handlers
 from mcmot.api.middleware import RequestContextMiddleware
 from mcmot.api.routers import all_routers
-from mcmot.core.container import Container
+from mcmot.container import Container
 from mcmot.core.logging import get_logger
 from mcmot.core.settings import Settings, load_settings
 
