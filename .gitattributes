@@ -1,0 +1,21 @@
+# Normalise line endings in the repository to LF, regardless of the platform a
+# clone happens on. Without this, a Linux or WSL clone shows every file as modified.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF: PowerShell tolerates LF, but some Windows tooling
+# does not.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Never touched: treating these as text would corrupt them.
+*.pt binary
+*.pth binary
+*.onnx binary
+*.engine binary
+*.faiss binary
+*.db binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.mp4 binary

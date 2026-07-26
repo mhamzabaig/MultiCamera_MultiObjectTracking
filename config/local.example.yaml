@@ -1,0 +1,28 @@
+# =============================================================================
+# Machine-local overrides.
+#
+#   Copy-Item config/local.example.yaml config/local.yaml
+#
+# config/local.yaml is gitignored. Only list the keys you actually want to
+# change: values are deep-merged over config/default.yaml, so partial nesting
+# is fine (overriding identity.tau_accept leaves every other identity key alone).
+# =============================================================================
+
+# --- Example: a laptop with no CUDA, or when you want to force CPU for a test ---
+# device:
+#   prefer: cpu
+
+# --- Example: tuned thresholds after running scripts/calibrate.py on your cameras ---
+# identity:
+#   tau_accept: 0.62
+#   tau_margin: 0.08
+
+# --- Example: lighter detector while iterating on the UI ---
+# detector:
+#   weights: yolo11n.pt
+#   image_size: 480
+
+# --- Example: verbose logs, JSON on the console too (useful when piping to jq) ---
+# logging:
+#   level: DEBUG
+#   console_format: json

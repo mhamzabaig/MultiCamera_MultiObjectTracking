@@ -1,0 +1,55 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# --- Tooling caches ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# --- Local configuration & secrets ---
+.env
+config/local.yaml
+
+# --- Generated artefacts (rebuildable; never committed) ---
+# Weights come from scripts/download_models.py, the database and FAISS index from
+# scripts/init_db.py, and logs from running the app. Nothing here is source.
+models/*
+!models/.gitkeep
+data/*
+!data/.gitkeep
+logs/*
+!logs/.gitkeep
+
+# Model weights anywhere else: Ultralytics silently downloads to the working
+# directory if a path is missing, and a 5-40 MB binary is easy to commit by accident.
+*.pt
+*.pth
+*.onnx
+*.engine
+*.whl
+
+# Ultralytics writes prediction artefacts here whenever save=True slips through.
+runs/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Misc ---
+*.log
+.python-version
+.ipynb_checkpoints/
