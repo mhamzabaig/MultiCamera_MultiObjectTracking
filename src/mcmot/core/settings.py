@@ -313,7 +313,9 @@ class RegistrationSettings(_Section):
     target_frames: int = Field(default=30, ge=1, le=200)
     min_accepted_frames: int = Field(default=8, ge=1)
     max_accepted_frames: int = Field(default=20, ge=1)
-    duplicate_similarity: float = Field(default=0.97, ge=0.0, le=1.0)
+    #: Very high on purpose: measured same-person similarity is 0.97-0.99, so a
+    #: lower value discards pose variety instead of true duplicates.
+    duplicate_similarity: float = Field(default=0.995, ge=0.0, le=1.0)
     representative_images: int = Field(default=3, ge=1, le=20)
 
     @model_validator(mode="after")

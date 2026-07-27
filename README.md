@@ -13,13 +13,17 @@ Video stream → YOLOv11 → ByteTrack → crop → OSNet ReID → Identity Serv
 
 ## Status
 
-**Phases 1–5 of 12 complete.** Foundation (configuration, structured logging,
-exception hierarchy, device management, domain contracts, DI container, API
-skeleton), storage (SQLite, `PersonRepository`, FAISS gallery index, image store),
-detection (YOLOv11n on CUDA — 72 FPS at 720p on an RTX 4050), tracking (ByteTrack —
-57 FPS detect-and-track end to end), and re-identification (OSNet-AIN — same person
-scores 0.97 mean, different people 0.43). The identity service and the UI arrive in
-later phases; see [docs/roadmap.md](docs/roadmap.md).
+**Phases 1–6 of 12 complete — recognition works end to end.** Foundation
+(configuration, structured logging, exception hierarchy, device management, domain
+contracts, DI container, API skeleton), storage (SQLite, `PersonRepository`, FAISS
+gallery index, image store), detection (YOLOv11n on CUDA — 72 FPS at 720p on an RTX
+4050), tracking (ByteTrack — 57 FPS detect-and-track end to end), re-identification
+(OSNet-AIN — same person 0.97 mean, different people 0.43), and the identity service
+(enrolment, dual-threshold gating, per-track temporal voting).
+
+You can now enrol a person and have them recognised by name, with strangers
+correctly reported as Unknown. Cameras, the live pipeline, and the web UI arrive in
+phases 7–10; see [docs/roadmap.md](docs/roadmap.md).
 
 ## Requirements
 
@@ -100,6 +104,7 @@ mypy
 | `src/mcmot/detection/` | `BaseDetector` interface and the YOLOv11 implementation |
 | `src/mcmot/tracking/` | `BaseTracker` interface and the ByteTrack implementation |
 | `src/mcmot/reid/` | `BaseEmbedder`, OSNet-AIN (vendored), and the crop quality gate |
+| `src/mcmot/identity/` | Enrolment, gallery search, thresholds, per-track voting |
 | `src/mcmot/container.py` | Composition root — wires every layer together |
 | `src/mcmot/api/` | Routers, schemas, dependencies, middleware, error mapping |
 | `config/` | `default.yaml` (committed) and `local.yaml` (yours) |

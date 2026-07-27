@@ -108,7 +108,12 @@ identity:
     target_frames: 30
     min_accepted_frames: 8
     max_accepted_frames: 20
-    duplicate_similarity: 0.97  # drop near-identical crops above this similarity
+    # Drop near-identical crops above this similarity. Deliberately very high:
+    # OSNet scores *different* views of the same person at 0.97-0.99, so a 0.97
+    # threshold discarded genuine pose variety and collapsed a 30-frame enrolment
+    # to a single embedding. Only truly redundant frames exceed 0.995. This is a
+    # preference, not a filter -- see IdentityService._select_gallery.
+    duplicate_similarity: 0.995
     representative_images: 3
 
 storage:

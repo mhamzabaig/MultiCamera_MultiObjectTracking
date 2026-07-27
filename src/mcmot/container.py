@@ -38,6 +38,7 @@ from mcmot.core.device import DeviceManager
 from mcmot.core.logging import configure_logging, get_logger
 from mcmot.core.settings import Settings, load_settings
 from mcmot.detection import BaseDetector, create_detector
+from mcmot.identity import IdentityService
 from mcmot.reid import BaseEmbedder, QualityGate, create_embedder
 from mcmot.storage.blobs import BlobStore
 from mcmot.storage.db import Database
@@ -121,6 +122,23 @@ class Container:
     def quality_gate(self) -> QualityGate:
         """Crop quality gate, shared by registration and tracking alike."""
         return QualityGate(self._settings.reid.quality)
+
+    @cached_property
+    def identity_service(self) -> IdentityService:
+        """Enrolment and identity resolution, shared by every camera.
+
+        Deliberately one instance: it holds the per-track vote state that makes
+        identities stable, so a second instance would split that evidence and each
+        camera would start from scratch.
+        """
+        return IdentityService(
+            config=self._settings.identity,
+            embedder=self.embedder,
+            quality_gate=self.quality_gate,
+            repository=self.person_repository,
+            index=self.vector_index,
+            blobs=self.blob_store,
+        )
 
     def create_tracker(self) -> BaseTracker:
         """Build a tracker for one camera.

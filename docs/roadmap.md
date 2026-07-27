@@ -11,8 +11,8 @@ begins.
 | 3 | Detection | ✅ **done** | `BaseDetector` + `YoloDetector` (yolo11n) + factory, warm-up, FP16, weight download script |
 | 4 | Tracking | ✅ **done** | `BaseTracker` + `ByteTrackTracker` + factory, per-camera id isolation |
 | 5 | ReID | ✅ **done** | `BaseEmbedder` + OSNet-AIN + preprocessing + quality gate + batching |
-| 6 | Identity Service | next | Enrolment, search, per-person aggregation, dual thresholds, temporal voting, CRUD, index maintenance |
-| 7 | Camera | | `CameraSource` (webcam / RTSP / HTTP / MJPEG / file), capture thread, manager, reconnection with backoff |
+| 6 | Identity Service | ✅ **done** | Enrolment, search, per-person aggregation, dual thresholds, temporal voting, CRUD, index maintenance |
+| 7 | Camera | next | `CameraSource` (webcam / RTSP / HTTP / MJPEG / file), capture thread, manager, reconnection with backoff |
 | 8 | Pipeline | | `PipelineWorker`, frame-skip policy, frame bus, annotator, metrics, MJPEG sink |
 | 9 | API | | Persons, cameras, tracking, settings, logs routers; DI wiring; error handlers |
 | 10 | Frontend | | Dashboard, Registration, Tracking, Database, Cameras, Settings, Logs pages |
@@ -180,6 +180,48 @@ a threshold of 45) and a clipped ratio hit its ceiling immediately. Since its on
 job is ranking candidate registration frames, a constant made it worthless. Replaced
 with `x / (x + k)`, which saturates smoothly and preserves ordering across the whole
 range; the four real crops now score 0.805–0.921.
+
+## Phase 6 — what was delivered
+
+| Module | Contents |
+|---|---|
+| `identity/voting.py` | `TrackVoter` — sliding window, asymmetric lock/unlock hysteresis, embed scheduling, track and person lifecycle |
+| `identity/service.py` | `IdentityService` — enrol, identify, search + per-person aggregation, dual thresholds, CRUD, rebuild |
+| `identity/__init__.py` | Exports |
+| `container.py` | `identity_service` singleton — one instance, because it holds the vote state |
+
+This is the phase where everything connects: detection produces boxes, tracking
+produces continuity, ReID produces fingerprints, and this turns them into a name.
+
+**Acceptance requires two conditions.** `score >= tau_accept` *and*
+`score - runner_up >= tau_margin`. The margin test is what a single threshold cannot
+express — it blocks a confident-but-wrong match between two similar-looking people.
+With one person enrolled there is no runner-up and the test is vacuous by design,
+since the only failure mode left is a stranger, which `tau_accept` covers.
+
+Verified end to end against real crops, enrolling two people from `bus.jpg`:
+
+| Property | Result |
+|---|---|
+| Recognition from an unseen view | Hamza 0.993, Ali 0.995, margin 0.48, both locked |
+| Stranger (never enrolled) | 0.467 vs `tau_accept` 0.55 → **Unknown**, never named |
+| Locked identity vs 7 conflicting frames | held as Hamza — hysteresis works |
+| Locked identity vs 10 more | released, as intended |
+| Genuine person switch on a reused track id | Hamza → Ali, re-locked |
+| Embed scheduling | every 10 frames unlocked, every 60 once locked |
+| Deleting a person | live track stopped showing the name immediately |
+| Index rebuild | DB and index counts stayed equal throughout |
+
+**A default that would have broken registration in production.**
+`duplicate_similarity` defaulted to 0.97, but Phase 5 measured *different views of
+the same person* at 0.97–0.99. So deduplication discarded genuine pose variety and
+collapsed a 30-frame enrolment into **one** embedding — the fragile single-shot
+gallery that multi-shot enrolment exists to avoid. Worse, real registration frames
+(someone holding a phone for three seconds) are even more similar, so this would have
+hit every user. Two changes: the threshold moved to 0.995, where only truly redundant
+frames are dropped, and deduplication became a *preference* rather than a filter —
+`_select_gallery` tops up from the best rejected frames when too few survive. Real
+enrolment now stores 8 embeddings instead of 1.
 
 ## Deliberate deferrals
 
