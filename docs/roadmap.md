@@ -12,8 +12,8 @@ begins.
 | 4 | Tracking | ✅ **done** | `BaseTracker` + `ByteTrackTracker` + factory, per-camera id isolation |
 | 5 | ReID | ✅ **done** | `BaseEmbedder` + OSNet-AIN + preprocessing + quality gate + batching |
 | 6 | Identity Service | ✅ **done** | Enrolment, search, per-person aggregation, dual thresholds, temporal voting, CRUD, index maintenance |
-| 7 | Camera | next | `CameraSource` (webcam / RTSP / HTTP / MJPEG / file), capture thread, manager, reconnection with backoff |
-| 8 | Pipeline | | `PipelineWorker`, frame-skip policy, frame bus, annotator, metrics, MJPEG sink |
+| 7 | Camera | ✅ **done** | `CameraSource` (webcam / RTSP / HTTP / file), capture thread, manager, reconnection with backoff |
+| 8 | Pipeline | next | `PipelineWorker`, frame-skip policy, frame bus, annotator, metrics, MJPEG sink |
 | 9 | API | | Persons, cameras, tracking, settings, logs routers; DI wiring; error handlers |
 | 10 | Frontend | | Dashboard, Registration, Tracking, Database, Cameras, Settings, Logs pages |
 | 11 | Mobile / HTTPS | | Cloudflare Tunnel scripts, phone-as-camera setup, threshold calibration tooling |
@@ -222,6 +222,57 @@ hit every user. Two changes: the threshold moved to 0.995, where only truly redu
 frames are dropped, and deduplication became a *preference* rather than a filter —
 `_select_gallery` tops up from the best rejected frames when too few survive. Real
 enrolment now stores 8 embeddings instead of 1.
+
+## Phase 7 — what was delivered
+
+| Module | Contents |
+|---|---|
+| `camera/source.py` | `CameraSpec` parses webcam index / RTSP / HTTP / file; `CameraSource` opens it with the right backend and properties |
+| `camera/capture.py` | `CaptureThread` — latest-frame-wins, reconnect with exponential backoff, per-camera stats |
+| `camera/manager.py` | `CameraManager` — one entry per camera id, open/close/latest/status |
+| `container.py` | `camera_manager` singleton; cameras stop **first** at shutdown, before storage |
+
+One class rather than four: OpenCV opens all four source kinds through `VideoCapture`,
+so the differences are a handful of branches, not a hierarchy.
+
+**Latest-frame-wins, proven rather than asserted.** A consumer running at 4 Hz against
+a 25 FPS source saw frame indices `31, 37, 43, 48, 55, 61` — gaps of 5–7, i.e. frames
+dropped rather than queued — with frame age at read staying between **16 and 47 ms**
+throughout. A queue would have shown steadily growing staleness while still reporting a
+healthy frame rate. Drops are counted (`dropped=60, delivered=61`), so the trade-off is
+visible instead of hidden.
+
+Verified: source parsing for all four kinds plus three rejection cases; capture from a
+file; `take()` delivering once; file end reported as `ended` with zero reconnects;
+reconnect giving up after the configured attempt limit with the reason recorded;
+manager rejecting duplicate ids and leaving no entry behind after a failed open;
+cameras stopping before storage at shutdown. Also against the real laptop webcam:
+1280×720 as requested, 63 ms latency.
+
+**Two defects found by running it.**
+
+*Open timeouts were silently ignored.* `CAP_PROP_OPEN_TIMEOUT_MSEC` was being set
+*after* `VideoCapture` was constructed — by which point the open has already happened.
+A dead RTSP address therefore blocked for OpenCV's 30 second default rather than the
+configured 1 second, which effectively breaks reconnection: a phone leaving Wi-Fi
+would stall for 30 s per retry. Measured against a dead address:
+
+| Mechanism | Time to fail |
+|---|---|
+| No options | 30.02 s |
+| `OPENCV_FFMPEG_CAPTURE_OPTIONS=timeout;…` | 30.03 s (no effect) |
+| `OPENCV_FFMPEG_CAPTURE_OPTIONS=stimeout;…` | 30.02 s (no effect) |
+| **Params passed to the constructor** | **1.09 s** |
+
+Only the constructor-parameter form is honoured. The env var is still used, but only
+for `rtsp_transport`, which has no other setter.
+
+*File sources ran at 1812 FPS.* A file has nothing to pace it — unlike a live source,
+whose `read()` blocks until the camera produces a frame — so a six-second clip was
+consumed in under a second while pinning a core. That makes a video file useless as a
+stand-in for a camera, and breaks the legitimate case of pointing the tracking page at
+a recording. `CaptureThread._pace` now throttles non-live sources to the file's own
+encoded rate, falling back to `camera.target_fps`.
 
 ## Deliberate deferrals
 

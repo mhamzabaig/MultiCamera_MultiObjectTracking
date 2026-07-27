@@ -34,6 +34,7 @@ import time
 from functools import cached_property
 from typing import Any
 
+from mcmot.camera import CameraManager
 from mcmot.core.device import DeviceManager
 from mcmot.core.logging import configure_logging, get_logger
 from mcmot.core.settings import Settings, load_settings
@@ -140,6 +141,11 @@ class Container:
             blobs=self.blob_store,
         )
 
+    @cached_property
+    def camera_manager(self) -> CameraManager:
+        """Registry of open cameras and their capture threads."""
+        return CameraManager(self._settings.camera)
+
     def create_tracker(self) -> BaseTracker:
         """Build a tracker for one camera.
 
@@ -242,6 +248,15 @@ class Container:
         # Reverse construction order. Each step is guarded: a failure while
         # shutting down must not prevent the remaining resources from being
         # released, and shutdown also runs after a partially-failed startup.
+
+        # Cameras first: their threads are the only things still reading from the
+        # index and the database, so stopping them makes the rest safe to close.
+        if "camera_manager" in self.__dict__:
+            try:
+                self.camera_manager.close_all()
+            except Exception:  # noqa: BLE001
+                self._log.exception("camera.close_all_failed")
+
         if "vector_index" in self.__dict__:
             try:
                 self.vector_index.save()
