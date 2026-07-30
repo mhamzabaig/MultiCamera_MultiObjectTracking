@@ -75,6 +75,10 @@ class CaptureThread:
         self._lock = threading.Lock()
 
         self._latest: Frame | None = None
+        # Whether anything has looked at the frame currently in the slot. Without
+        # this, a consumer using the non-consuming `latest()` would score a drop on
+        # every single frame, since the slot is never emptied.
+        self._latest_read = True
         self._state = CaptureState.IDLE
         self._error: str | None = None
 
@@ -144,6 +148,7 @@ class CaptureThread:
         arrives. The pipeline pairs this with the frame index to notice repeats.
         """
         with self._lock:
+            self._latest_read = True
             return self._latest
 
     def take(self) -> Frame | None:
@@ -151,6 +156,7 @@ class CaptureThread:
         with self._lock:
             frame = self._latest
             self._latest = None
+            self._latest_read = True
             return frame
 
     # -- status -----------------------------------------------------------
@@ -262,11 +268,15 @@ class CaptureThread:
         self._frame_index += 1
         frame = Frame.create(image, camera_id=self._spec.camera_id, index=self._frame_index)
         with self._lock:
-            if self._latest is not None:
-                # Nothing consumed the previous frame. Expected and healthy whenever
-                # capture outpaces the pipeline; the count is what makes it visible.
+            if self._latest is not None and not self._latest_read:
+                # Nobody ever looked at the previous frame. Expected and healthy
+                # whenever capture outpaces the pipeline; the count is what makes the
+                # trade-off visible. The read flag is what keeps this honest for
+                # consumers that peek with `latest()` instead of draining with
+                # `take()` — without it every frame after the first scores a drop.
                 self._dropped += 1
             self._latest = frame
+            self._latest_read = False
             self._delivered += 1
             self._timestamps.append(frame.meta.monotonic)
 

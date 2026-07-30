@@ -40,6 +40,7 @@ from mcmot.core.logging import configure_logging, get_logger
 from mcmot.core.settings import Settings, load_settings
 from mcmot.detection import BaseDetector, create_detector
 from mcmot.identity import IdentityService
+from mcmot.pipeline import PipelineManager
 from mcmot.reid import BaseEmbedder, QualityGate, create_embedder
 from mcmot.storage.blobs import BlobStore
 from mcmot.storage.db import Database
@@ -155,6 +156,21 @@ class Container:
         """
         return create_tracker(self._settings.tracker)
 
+    @cached_property
+    def pipeline_manager(self) -> PipelineManager:
+        """Registry of per-camera tracking pipelines.
+
+        Touching this constructs the detector and, through the identity service, the
+        embedder — so the models load here rather than on the first tracked frame.
+        """
+        return PipelineManager(
+            camera_manager=self.camera_manager,
+            detector=self.detector,
+            identity=self.identity_service,
+            tracker_factory=self.create_tracker,
+            config=self._settings.pipeline,
+        )
+
     # -- lifecycle --------------------------------------------------------
     def startup(self) -> None:
         """Prepare the process: directories, logging, device, then eager wiring.
@@ -249,8 +265,16 @@ class Container:
         # shutting down must not prevent the remaining resources from being
         # released, and shutdown also runs after a partially-failed startup.
 
-        # Cameras first: their threads are the only things still reading from the
-        # index and the database, so stopping them makes the rest safe to close.
+        # Pipelines first: they read from the capture threads and the identity
+        # service, so stopping them makes both safe to tear down.
+        if "pipeline_manager" in self.__dict__:
+            try:
+                self.pipeline_manager.stop_all()
+            except Exception:  # noqa: BLE001
+                self._log.exception("pipeline.stop_all_failed")
+
+        # Then cameras: their threads are the last things still touching the index
+        # and the database, so stopping them makes the rest safe to close.
         if "camera_manager" in self.__dict__:
             try:
                 self.camera_manager.close_all()

@@ -13,8 +13,8 @@ begins.
 | 5 | ReID | ✅ **done** | `BaseEmbedder` + OSNet-AIN + preprocessing + quality gate + batching |
 | 6 | Identity Service | ✅ **done** | Enrolment, search, per-person aggregation, dual thresholds, temporal voting, CRUD, index maintenance |
 | 7 | Camera | ✅ **done** | `CameraSource` (webcam / RTSP / HTTP / file), capture thread, manager, reconnection with backoff |
-| 8 | Pipeline | next | `PipelineWorker`, frame-skip policy, frame bus, annotator, metrics, MJPEG sink |
-| 9 | API | | Persons, cameras, tracking, settings, logs routers; DI wiring; error handlers |
+| 8 | Pipeline | ✅ **done** | `PipelineWorker`, frame-skip policy, state retirement, annotator, metrics, MJPEG sink |
+| 9 | API | next | Persons, cameras, tracking, settings, logs routers; DI wiring; error handlers |
 | 10 | Frontend | | Dashboard, Registration, Tracking, Database, Cameras, Settings, Logs pages |
 | 11 | Mobile / HTTPS | | Cloudflare Tunnel scripts, phone-as-camera setup, threshold calibration tooling |
 | 12 | Hardening | | Full unit / integration / API / load suites, benchmarks, Docker, deployment docs |
@@ -273,6 +273,71 @@ consumed in under a second while pinning a core. That makes a video file useless
 stand-in for a camera, and breaks the legitimate case of pointing the tracking page at
 a recording. `CaptureThread._pace` now throttles non-live sources to the file's own
 encoded rate, falling back to `camera.target_fps`.
+
+## Phase 8 — what was delivered
+
+| Module | Contents |
+|---|---|
+| `pipeline/worker.py` | `PipelineWorker` — one thread per camera running detect → track → sample-identify → annotate → encode; stale-frame skipping, rolling metrics, per-frame error tolerance |
+| `pipeline/annotator.py` | `Annotator` — colour by verdict (green locked, amber deciding, grey stranger), shadowed text, labels clamped inside the frame |
+| `pipeline/stream.py` | `mjpeg_stream` — `multipart/x-mixed-replace`, one JPEG per new frame, startup grace and stall timeout |
+| `pipeline/manager.py` | `PipelineManager` — one worker per camera and the single GPU lock they share |
+| `container.py` | `pipeline_manager` singleton; shutdown stops pipelines **before** cameras |
+
+Measured on the RTX 4050 against a generated 810×1080 clip (zoom-and-pan over
+`bus.jpg`, four real people), enrolling two of them from the first three seconds and
+recognising over the rest:
+
+| | Result |
+|---|---|
+| End to end | 17 FPS, 55 ms/frame — detect 25 ms, ReID 12 ms, annotate + encode ~18 ms |
+| Coverage | 251 of 291 captured frames processed (86%), 39 unseen drops, 0 stale skips |
+| Embedding load | 0.23 per frame against 4.00 for naive per-person-per-frame — **17× less** |
+| Recognition | enrolled subject named at 0.99 and locked; the two never enrolled stayed **Unknown**; a newcomer showed "Identifying…" |
+| First annotated frame | 0.41 s after `start()` |
+| Stalled camera | 17.4 FPS while running → 5.2 after 3 s with no frames |
+| Stop / restart | pipeline released, restarted clean, identities resolved again |
+
+**The defect that mattered.** ByteTrack returns only the tracks it matched *this*
+frame, but keeps a lost one internally for `track_buffer` frames and revives it under
+the same id. The worker released identity state on per-frame absence, so **one missed
+detection wiped a locked identity** — the label reverting to "Identifying…" and the
+vote restarting for anyone who walked behind a chair. That defeats the hysteresis
+phase 6 exists to provide, and it fails silently: no error, just a flickering name.
+State is now retired on the tracker's own horizon, counted in *processed* frames
+because that is the tracker's clock — camera frame indices advance faster whenever
+frames are skipped, which would retire identities early.
+
+**Three more found by measuring rather than reading.**
+
+*FPS froze instead of decaying.* Computed between the first and last processed frame,
+the figure never changed once a camera stalled: a dead stream kept reporting the
+healthy rate it had while alive. Now measured to *now*, so it decays to zero. The
+window also had to move from `time.monotonic` to `time.perf_counter` — monotonic's
+resolution on Windows is ~15 ms, so several fast frames share one tick and a short
+window can span exactly zero, reporting 0 FPS while running fine.
+
+*`frames_dropped` was meaningless.* It counted "the slot was occupied", so with the
+pipeline peeking via the non-consuming `latest()` it read **285 of 286** on a
+perfectly healthy camera. A 100% drop rate that means nothing is worse than no
+metric: it is the number that gets a real problem ignored. It now counts frames
+nobody ever looked at — 39 of 291, matching the 40 the pipeline actually missed.
+
+*One bad frame killed the camera.* Any exception ended the worker permanently. A
+truncated JPEG or a transient CUDA error should cost one frame, so failures are now
+tolerated up to five consecutive before the worker fails.
+
+**Known shortfall, not yet fixed.** `_resolve_identities` calls
+`IdentityService.identify()` **once per track**, so each person in a frame runs its
+own OSNet forward pass. Since OSNet is kernel-launch-bound and flat in batch size
+(~21 ms for 1 crop or 16), four people due on the same frame costs ~84 ms instead of
+~21 ms — directly contradicting "always batch" in
+[architecture.md](architecture.md#reid--osnet-ain-x10). Fixing it needs a batch entry
+point on the identity service, which is a phase 6 API change; measured upside is
+roughly 25% of total pipeline time on four-person frames.
+
+Verified: `pytest` 308 passed (24 new, all with fakes — no GPU, no weights, no
+camera) · `ruff` clean · `mypy --strict` clean.
 
 ## Deliberate deferrals
 
