@@ -14,8 +14,8 @@ begins.
 | 6 | Identity Service | ✅ **done** | Enrolment, search, per-person aggregation, dual thresholds, temporal voting, CRUD, index maintenance |
 | 7 | Camera | ✅ **done** | `CameraSource` (webcam / RTSP / HTTP / file), capture thread, manager, reconnection with backoff |
 | 8 | Pipeline | ✅ **done** | `PipelineWorker`, frame-skip policy, state retirement, annotator, metrics, MJPEG sink |
-| 9 | API | next | Persons, cameras, tracking, settings, logs routers; DI wiring; error handlers |
-| 10 | Frontend | | Dashboard, Registration, Tracking, Database, Cameras, Settings, Logs pages |
+| 9 | API | ✅ **done** | Persons, cameras, tracking routers; settings and logs endpoints; registration service; MJPEG endpoint |
+| 10 | Frontend | next | Dashboard, Registration, Tracking, Database, Cameras, Settings, Logs pages |
 | 11 | Mobile / HTTPS | | Cloudflare Tunnel scripts, phone-as-camera setup, threshold calibration tooling |
 | 12 | Hardening | | Full unit / integration / API / load suites, benchmarks, Docker, deployment docs |
 
@@ -338,6 +338,78 @@ roughly 25% of total pipeline time on four-person frames.
 
 Verified: `pytest` 308 passed (24 new, all with fakes — no GPU, no weights, no
 camera) · `ruff` clean · `mypy --strict` clean.
+
+## Phase 9 — what was delivered
+
+| Module | Contents |
+|---|---|
+| `api/routers/persons.py` | Register (multipart), list, get, thumbnail, rename, delete, rebuild index |
+| `api/routers/cameras.py` | Open, list, get, close — closing stops a running pipeline first |
+| `api/routers/tracking.py` | Start, stop, list, status, and the MJPEG stream endpoint |
+| `api/routers/system.py` | Adds read-only settings and a log tail with level filtering |
+| `api/schemas/` | `persons`, `cameras`, `tracking` models; settings and log models on `system` |
+| `services/registration.py` | `RegistrationService` — decode, detect, crop, enrol |
+| `container.py` | `registration_service` singleton, sharing the tracking detector |
+
+Twenty endpoints. **Opening a camera and tracking on it are separate operations**, so
+a phone's stream URL can be checked for reachability without loading models.
+
+**Which handlers are async.** Only the ones that await something. Everything else is a
+plain `def`, which FastAPI runs in its own threadpool — so a SQLite query or a 4-second
+enrolment cannot block the event loop and stall every MJPEG stream in the process.
+Registration awaits the upload, then hands the CPU-and-GPU work to a worker thread.
+
+**Settings are read-only, and that is the design.** Configuration is validated exactly
+once at boot and every component holds the section it was given; mutating a threshold
+mid-run would leave the process disagreeing with itself. `PUT`/`POST`/`PATCH` on the
+settings endpoint return 405, asserted by a test so it stays deliberate.
+
+Verified against a **live uvicorn server over HTTP only**, no imports of `mcmot`:
+
+| Step | Result |
+|---|---|
+| Register 24 real frames | 201 in 4.0 s → 18 embeddings; index and database agreed |
+| Thumbnail | 200, 44 KB, `image/jpeg` |
+| Duplicate name | 409 `person.already_exists` |
+| Malformed source | 422 `camera.invalid_source` |
+| RTSP credentials | returned as `rtsp://***@192.0.2.9:554/s` |
+| Tracking | 18.4 FPS, 55 ms latency, 3 people tracked |
+| MJPEG stream | 30 chunks, 1.6 MB, 3.8 MB/s |
+| Logs / settings | tail with `truncated` flag; `editable=false` |
+| Teardown | stop 204, close 204, delete 204, gallery back to empty |
+
+**Identity discrimination, measured.** Enrolling one person from a clean single-person
+crop and then tracking a four-person scene: **1 named, 3 Unknown**, held across the
+whole clip. The gallery separates people rather than labelling everyone.
+
+**Two defects found by writing the tests.**
+
+*Camera failures all claimed to be the camera's fault.* `CameraError` declares `502
+Bad Gateway`, and both "that id is already open" and "that source string is nonsense"
+inherited it. A browser could not tell a malformed URL from an unreachable camera —
+exactly the distinction someone typing a phone's stream address needs. Split into
+`InvalidCameraSourceError` (422) and `CameraAlreadyOpenError` (409).
+
+*RTSP passwords leaked.* IP cameras are addressed as
+`rtsp://user:password@host/stream`, and `CameraSpec.to_dict()` returned that string
+verbatim — into the API response, into `camera.registered` in the log file, and (next
+phase) onto the Cameras page. `redacted_source` now strips credentials everywhere
+except the one call that must dial the camera. The settings layer's `redact_url` was
+made public and shared rather than reimplemented, so the two cannot drift.
+
+**A registration risk worth knowing about, not yet fixed.** `RegistrationService`
+keeps the *largest* detection per frame, which is right for a deliberate registration
+but has no coherence check on the resulting gallery. If a bystander becomes the
+largest detection partway through a capture burst — someone walking behind you while
+you hold the phone — the gallery silently mixes two people and both are then
+recognised under the one name. This was observed while verifying: enrolling from a
+four-person street scene produced a gallery that matched three different people. The
+fix is outlier rejection in `_select_gallery` (keep only embeddings close to the
+gallery median), which is a phase 6 change and a new threshold, so it is recorded
+here rather than slipped in.
+
+Verified: `pytest` 374 passed (66 new API tests) · `ruff` clean · `mypy --strict`
+clean.
 
 ## Deliberate deferrals
 

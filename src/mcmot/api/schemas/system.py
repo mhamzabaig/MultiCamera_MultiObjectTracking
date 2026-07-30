@@ -12,7 +12,15 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-__all__ = ["DeviceStatus", "ErrorResponse", "HealthResponse", "VersionResponse"]
+__all__ = [
+    "DeviceStatus",
+    "ErrorResponse",
+    "HealthResponse",
+    "LogEntry",
+    "LogsResponse",
+    "SettingsResponse",
+    "VersionResponse",
+]
 
 
 class DeviceStatus(BaseModel):
@@ -63,6 +71,52 @@ class VersionResponse(BaseModel):
     name: str
     version: str
     env: Literal["dev", "test", "prod"]
+
+
+class SettingsResponse(BaseModel):
+    """The active configuration, redacted.
+
+    Read-only on purpose. Configuration is validated exactly once, at boot, and
+    every component holds the section it was given; mutating a threshold mid-run
+    would leave the process disagreeing with itself about what is configured.
+    Changing a value means editing ``config/local.yaml`` and restarting, which is
+    also what makes a running system's behaviour reproducible.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    config: dict[str, Any] = Field(description="Redacted summary of the active configuration.")
+    editable: bool = Field(
+        default=False,
+        description="Always false: settings are file-driven and applied at startup.",
+    )
+    config_files: list[str] = Field(
+        default_factory=list, description="Configuration files that were loaded, in merge order."
+    )
+
+
+class LogEntry(BaseModel):
+    """One structured log record."""
+
+    # Permissive: log records carry whatever context was bound at the call site
+    # (camera_id, track_id, request_id), and the point of structured logging is that
+    # those fields survive to the reader.
+    model_config = ConfigDict(extra="allow")
+
+    timestamp: str | None = None
+    level: str | None = None
+    event: str | None = None
+    logger: str | None = None
+
+
+class LogsResponse(BaseModel):
+    """The tail of the structured log."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    entries: list[LogEntry] = Field(description="Newest last, so the view reads top to bottom.")
+    file: str | None = Field(default=None, description="Log file read, or null if disabled.")
+    truncated: bool = Field(description="True when older records exist beyond the returned window.")
 
 
 class ErrorResponse(BaseModel):

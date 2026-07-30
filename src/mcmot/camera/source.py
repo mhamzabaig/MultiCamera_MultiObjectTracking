@@ -32,9 +32,13 @@ from typing import Any, cast
 
 import cv2
 
-from mcmot.core.errors import CameraDisconnectedError, CameraError
+from mcmot.core.errors import (
+    CameraDisconnectedError,
+    CameraError,
+    InvalidCameraSourceError,
+)
 from mcmot.core.logging import get_logger
-from mcmot.core.settings import CameraSettings
+from mcmot.core.settings import CameraSettings, redact_url
 from mcmot.domain.types import ImageArray
 
 __all__ = ["CameraSource", "CameraSpec", "SourceKind"]
@@ -74,14 +78,18 @@ class CameraSpec:
             The resolved specification.
 
         Raises:
-            CameraError: If the id is blank, or the source is empty or unrecognisable.
+            InvalidCameraSourceError: If the id is blank, or the source is empty or
+                unrecognisable. A 422 rather than the base class's 502: the request
+                was wrong, which is a different thing from the camera being down.
         """
         if not camera_id.strip():
-            raise CameraError("Camera id must not be empty.")
+            raise InvalidCameraSourceError("Camera id must not be empty.")
 
         text = str(source).strip()
         if not text:
-            raise CameraError("Camera source must not be empty.", details={"camera_id": camera_id})
+            raise InvalidCameraSourceError(
+                "Camera source must not be empty.", details={"camera_id": camera_id}
+            )
 
         lowered = text.lower()
         if text.isdigit():
@@ -93,10 +101,10 @@ class CameraSpec:
         elif Path(text).is_file():
             kind = SourceKind.FILE
         else:
-            raise CameraError(
+            raise InvalidCameraSourceError(
                 "Unrecognised camera source. Expected a device index (0), an "
                 "rtsp:// or http:// URL, or a path to an existing video file.",
-                details={"camera_id": camera_id, "source": text},
+                details={"camera_id": camera_id, "source": redact_url(text)},
             )
         return cls(camera_id=camera_id.strip(), source=text, kind=kind)
 
@@ -105,9 +113,24 @@ class CameraSpec:
         """Whether this source is a live stream, and so worth reconnecting to."""
         return self.kind is not SourceKind.FILE
 
+    @property
+    def redacted_source(self) -> str:
+        """The source with any embedded credentials removed.
+
+        IP cameras are routinely addressed as ``rtsp://user:password@host/stream``,
+        and that string would otherwise travel into every log line, every API
+        response, and every camera row on the dashboard. The real source stays in
+        ``source`` for the one caller that must dial it.
+        """
+        return redact_url(self.source)
+
     def to_dict(self) -> dict[str, Any]:
-        """Return a serialisable view for API responses."""
-        return {"camera_id": self.camera_id, "source": self.source, "kind": self.kind.value}
+        """Return a serialisable view for API responses. Credentials are stripped."""
+        return {
+            "camera_id": self.camera_id,
+            "source": self.redacted_source,
+            "kind": self.kind.value,
+        }
 
 
 class CameraSource:
@@ -173,7 +196,7 @@ class CameraSource:
         if not capture.isOpened():
             capture.release()
             raise CameraError(
-                f"Could not open camera source: {self._spec.source}",
+                f"Could not open camera source: {self._spec.redacted_source}",
                 details=self._spec.to_dict(),
             )
 

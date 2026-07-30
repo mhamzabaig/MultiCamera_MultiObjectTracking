@@ -27,6 +27,7 @@ from http import HTTPStatus
 from typing import Any
 
 __all__ = [
+    "CameraAlreadyOpenError",
     "CameraDisconnectedError",
     "CameraError",
     "CameraNotFoundError",
@@ -34,6 +35,7 @@ __all__ = [
     "ConfigError",
     "DeviceError",
     "IdentityError",
+    "InvalidCameraSourceError",
     "InvalidImageError",
     "MCMOTError",
     "ModelLoadError",
@@ -141,6 +143,28 @@ class CameraNotFoundError(CameraError):
     code = "camera.not_found"
     http_status = HTTPStatus.NOT_FOUND
     default_message = "Camera not found."
+
+
+class InvalidCameraSourceError(CameraError):
+    """The source string is not a recognisable camera.
+
+    A client mistake, not an upstream fault, so it must not inherit
+    :class:`CameraError`'s ``502``. Someone typing a phone's stream URL needs to be
+    told their URL is malformed, which is a different problem from the camera being
+    unreachable — and only the status code carries that distinction to a browser.
+    """
+
+    code = "camera.invalid_source"
+    http_status = HTTPStatus.UNPROCESSABLE_ENTITY
+    default_message = "Unrecognised camera source."
+
+
+class CameraAlreadyOpenError(CameraError):
+    """A camera is already open under this identifier."""
+
+    code = "camera.already_open"
+    http_status = HTTPStatus.CONFLICT
+    default_message = "A camera is already open under this id."
 
 
 class CameraDisconnectedError(CameraError):

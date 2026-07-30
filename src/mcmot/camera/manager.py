@@ -17,7 +17,7 @@ from typing import Any
 
 from mcmot.camera.capture import CaptureThread
 from mcmot.camera.source import CameraSpec
-from mcmot.core.errors import CameraError, CameraNotFoundError
+from mcmot.core.errors import CameraAlreadyOpenError, CameraNotFoundError
 from mcmot.core.logging import get_logger
 from mcmot.core.settings import CameraSettings
 from mcmot.domain.frame import Frame
@@ -52,12 +52,13 @@ class CameraManager:
             The resolved specification.
 
         Raises:
-            CameraError: If the source is unrecognisable or the id is already open.
+            InvalidCameraSourceError: If the source is unrecognisable.
+            CameraAlreadyOpenError: If a camera is already open under this id.
         """
         spec = CameraSpec.parse(camera_id, source)
         with self._lock:
             if spec.camera_id in self._cameras:
-                raise CameraError(
+                raise CameraAlreadyOpenError(
                     f"Camera {spec.camera_id!r} is already open. Close it first.",
                     details={"camera_id": spec.camera_id},
                 )

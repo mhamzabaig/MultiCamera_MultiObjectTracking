@@ -42,6 +42,7 @@ from mcmot.detection import BaseDetector, create_detector
 from mcmot.identity import IdentityService
 from mcmot.pipeline import PipelineManager
 from mcmot.reid import BaseEmbedder, QualityGate, create_embedder
+from mcmot.services import RegistrationService
 from mcmot.storage.blobs import BlobStore
 from mcmot.storage.db import Database
 from mcmot.storage.repository import PersonRepository
@@ -141,6 +142,16 @@ class Container:
             index=self.vector_index,
             blobs=self.blob_store,
         )
+
+    @cached_property
+    def registration_service(self) -> RegistrationService:
+        """Turns uploaded frames into an enrolled person.
+
+        Shares the tracking pipeline's detector on purpose: enrolment and inference
+        must agree on what a person crop is, or the gallery is built from one
+        distribution and queried with another.
+        """
+        return RegistrationService(detector=self.detector, identity=self.identity_service)
 
     @cached_property
     def camera_manager(self) -> CameraManager:

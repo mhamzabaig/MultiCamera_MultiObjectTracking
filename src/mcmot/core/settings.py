@@ -60,6 +60,7 @@ __all__ = [
     "StorageSettings",
     "TrackerSettings",
     "load_settings",
+    "redact_url",
     "resolve_config_dir",
 ]
 
@@ -577,7 +578,7 @@ class Settings(BaseSettings):
                 "top_k": self.identity.top_k,
                 "vote_window": self.identity.vote_window,
             },
-            "storage": {"database": _redact_url(self.storage.database_url)},
+            "storage": {"database": redact_url(self.storage.database_url)},
             "pipeline": {
                 "queue_size": self.pipeline.queue_size,
                 "jpeg_quality": self.pipeline.jpeg_quality,
@@ -585,8 +586,12 @@ class Settings(BaseSettings):
         }
 
 
-def _redact_url(url: str) -> str:
-    """Strip credentials from a database URL before it reaches a log or a client."""
+def redact_url(url: str) -> str:
+    """Strip credentials from a URL before it reaches a log or a client.
+
+    Shared with the camera layer: an RTSP source is addressed exactly like a
+    database URL, and two implementations of this rule would drift apart.
+    """
     if "@" not in url or "://" not in url:
         return url
     scheme, _, rest = url.partition("://")
