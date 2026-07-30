@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid stats">
+  <div class="stat"><div class="label">People</div><div class="value" id="s-persons">—</div></div>
+  <div class="stat"><div class="label">Embeddings</div><div class="value" id="s-embeddings">—</div></div>
+  <div class="stat"><div class="label">Index vectors</div><div class="value" id="s-vectors">—</div></div>
+  <div class="stat"><div class="label">Tracks voting</div><div class="value" id="s-tracked">—</div></div>
+</div>
+
+<div id="divergence" class="warn-box" hidden>
+  <strong>The index has drifted from the database.</strong>
+  SQLite is the source of truth and the vector index is a derived cache, so rebuilding
+  is always safe.
+</div>
+
+<div class="panel">
+  <div class="actions" style="margin-top:0">
+    <button id="rebuild">Rebuild search index</button>
+  </div>
+  <p class="hint">
+    Rebuilding discards the index and recreates it from the database. Use it if the
+    counts above disagree, or after restoring a backup.
+  </p>
+</div>
+
+<div class="panel">
+  <h2>Enrolled people</h2>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th></th><th>Name</th><th class="num">Embeddings</th>
+          <th>Registered</th><th>Person id</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="rows"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <p class="hint">
+    Deleting removes the person from the database, the search index, and the stored
+    images, and takes effect on running cameras immediately — a track showing that name
+    stops showing it on its next verdict.
+  </p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/database.js"></script>
+{% endblock %}

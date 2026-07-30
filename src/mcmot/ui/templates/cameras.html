@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="panel">
+  <h2>Add a camera</h2>
+  <div class="row">
+    <div class="field" style="max-width:200px">
+      <label for="camera-id">Camera id</label>
+      <input type="text" id="camera-id" placeholder="phone" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="source">Source</label>
+      <input type="text" id="source" placeholder="0  ·  rtsp://…  ·  http://192.168.1.42:8080/video" autocomplete="off">
+    </div>
+    <button id="add" class="primary">Add</button>
+  </div>
+  <p class="hint">
+    Accepted sources: a webcam index such as <code>0</code>, an <code>rtsp://</code> URL,
+    an <code>http://</code> MJPEG URL (what phone IP-camera apps serve), or a path to a
+    video file. Adding returns immediately — a camera that is not powered on yet shows as
+    <code>connecting</code> and reconnects on its own rather than failing.
+  </p>
+</div>
+
+<div class="panel">
+  <h2>Open cameras</h2>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Camera</th><th>Source</th><th>Kind</th><th>State</th>
+          <th class="num">FPS</th><th class="num">Latency</th>
+          <th class="num">Delivered</th><th class="num">Dropped</th>
+          <th class="num">Reconnects</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="rows"><tr><td colspan="10" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <p class="hint">
+    Credentials in a source URL are stripped before it is stored or displayed, so an
+    <code>rtsp://user:pass@host</code> address shows as <code>rtsp://***@host</code>.
+  </p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/cameras.js"></script>
+{% endblock %}

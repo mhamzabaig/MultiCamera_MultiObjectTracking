@@ -15,8 +15,8 @@ begins.
 | 7 | Camera | ✅ **done** | `CameraSource` (webcam / RTSP / HTTP / file), capture thread, manager, reconnection with backoff |
 | 8 | Pipeline | ✅ **done** | `PipelineWorker`, frame-skip policy, state retirement, annotator, metrics, MJPEG sink |
 | 9 | API | ✅ **done** | Persons, cameras, tracking routers; settings and logs endpoints; registration service; MJPEG endpoint |
-| 10 | Frontend | next | Dashboard, Registration, Tracking, Database, Cameras, Settings, Logs pages |
-| 11 | Mobile / HTTPS | | Cloudflare Tunnel scripts, phone-as-camera setup, threshold calibration tooling |
+| 10 | Frontend | ✅ **done** | Seven pages, own stylesheet, vanilla JS, browser capture, MJPEG viewer |
+| 11 | Mobile / HTTPS | next | Cloudflare Tunnel scripts, phone-as-camera setup, threshold calibration tooling |
 | 12 | Hardening | | Full unit / integration / API / load suites, benchmarks, Docker, deployment docs |
 
 Phases 1–2 are load-bearing: every later phase plugs into interfaces defined
@@ -410,6 +410,50 @@ here rather than slipped in.
 
 Verified: `pytest` 374 passed (66 new API tests) · `ruff` clean · `mypy --strict`
 clean.
+
+## Phase 10 — what was delivered
+
+| Module | Contents |
+|---|---|
+| `ui/pages.py` | Seven page routes and the nav definition they share |
+| `ui/templates/` | `base.html` plus one template per page |
+| `ui/static/css/app.css` | One stylesheet: dark by default, light following the OS, responsive |
+| `ui/static/js/api.js` | API client, problem+json error toasts, self-throttling poller, formatters |
+| `ui/static/js/*.js` | One script per page |
+| `main.py` | Static mount and page router; `/` is now the dashboard |
+
+**The framework plan was dropped, deliberately.** Bootstrap + HTMX + Alpine were the
+documented choice; the pages turned out to need `getUserMedia`, an `<img>`, and
+`fetch`, none of which a framework helps with. Three CDN libraries would mean an
+unstyled dashboard whenever the network is down — for a system whose premise is
+running on your own LAN. See [architecture.md](architecture.md#frontend--jinja-one-stylesheet-vanilla-js).
+
+**Pages are shells.** Every one fetches from the same REST API any other client uses,
+so a screen cannot disagree with the API about what is true.
+
+Verified in real Chrome, headless, against a live server with a person enrolled, two
+cameras open, and one pipeline running: all seven pages render, every referenced asset
+resolves, the MJPEG viewer shows annotated video with **"Hamza Baig 0.98" in green and
+two "Unknown" boxes**, thumbnails load from the blob store, and the metric tiles track
+the pipeline.
+
+**A third frozen-rate defect, found by looking at the dashboard.** The Cameras table
+showed `state=ended` beside `25.8 fps`. `CaptureThread._fps()` divided by the span
+between the first and last captured frame — the same mistake fixed in the pipeline
+worker in phase 8, still present one layer down. A camera that ends, or drops off
+Wi-Fi, kept publishing the healthy rate it had while alive. Now measured to now:
+20.6 fps while streaming, decaying to 8.6 within a few seconds of the clip ending.
+
+That makes three defects of one shape (pipeline FPS, camera FPS, dropped-frame
+counting) — all in *reporting* rather than function, all invisible to manual testing
+because the system kept working while the numbers lied. `tests/unit/test_camera.py`
+now pins the counters down.
+
+Latency is also rendered as seconds past 5 000 ms: a stalled camera's newest frame is
+tens of thousands of milliseconds old, and `57187` under a heading of "Latency" reads
+as a glitch rather than as a dead stream.
+
+Verified: `pytest` 416 passed (42 new) · `ruff` clean · `mypy --strict` clean.
 
 ## Deliberate deferrals
 

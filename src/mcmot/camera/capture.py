@@ -178,10 +178,17 @@ class CaptureThread:
             }
 
     def _fps(self) -> float:
-        """Delivered frame rate over the recent window. Caller holds the lock."""
+        """Delivered frame rate over the recent window. Caller holds the lock.
+
+        Measured to *now* rather than to the newest frame. Dividing by the span
+        between the first and last captured frame freezes the reading: a camera that
+        has ended or dropped off Wi-Fi keeps reporting the healthy rate it had while
+        alive, so the dashboard shows ``state=ended`` beside ``25.8 fps``. Ending the
+        window at now makes the figure decay toward zero instead.
+        """
         if len(self._timestamps) < 2:
             return 0.0
-        span = self._timestamps[-1] - self._timestamps[0]
+        span = time.monotonic() - self._timestamps[0]
         return round((len(self._timestamps) - 1) / span, 2) if span > 0 else 0.0
 
     # -- the thread -------------------------------------------------------

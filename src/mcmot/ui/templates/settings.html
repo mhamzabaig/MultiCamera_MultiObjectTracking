@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="panel">
+  <p class="hint" style="margin-top:0">
+    Read-only, deliberately. Configuration is validated once at startup and each
+    component keeps the section it was given, so changing a threshold in a running
+    process would leave it disagreeing with itself about what is configured. To change
+    a value, edit <code>config/local.yaml</code> and restart — which is also what makes
+    a run reproducible.
+  </p>
+  <p class="hint" id="files">Loading…</p>
+</div>
+
+<div class="grid two">
+  <div class="panel">
+    <h2>Thresholds that matter most</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Setting</th><th class="num">Value</th><th>Effect</th></tr></thead>
+        <tbody id="key-settings"><tr><td colspan="3" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Active configuration</h2>
+    <pre class="config" id="config">Loading…</pre>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/settings.js"></script>
+{% endblock %}

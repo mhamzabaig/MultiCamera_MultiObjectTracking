@@ -121,11 +121,12 @@ class TestVersion:
 
 
 class TestRootAndDocs:
-    def test_root_describes_the_service(self, client: TestClient) -> None:
-        payload = client.get("/").json()
+    def test_root_serves_the_dashboard(self, client: TestClient) -> None:
+        response = client.get("/")
 
-        assert payload["name"] == "mcmot"
-        assert payload["health"] == "/api/system/health"
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/html")
+        assert "Dashboard" in response.text
 
     def test_openapi_schema_is_served(self, client: TestClient) -> None:
         schema = client.get("/openapi.json").json()

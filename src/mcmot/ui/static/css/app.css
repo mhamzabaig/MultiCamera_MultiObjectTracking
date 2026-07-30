@@ -1,0 +1,292 @@
+/*
+ * One stylesheet, served from our own origin.
+ *
+ * Dark by default: this is a surveillance console, usually on a screen someone
+ * watches for a while, and it renders next to video that is mostly dark anyway.
+ * Light mode follows the OS so a phone in daylight is still readable.
+ */
+
+:root {
+  --bg: #12151a;
+  --panel: #1a1f27;
+  --panel-2: #212834;
+  --line: #2c3542;
+  --text: #e6eaf0;
+  --muted: #94a3b8;
+  --accent: #4c9ffe;
+  --ok: #3ec46d;
+  --warn: #f0b429;
+  --bad: #f2545b;
+  --radius: 10px;
+  --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f4f6fa;
+    --panel: #ffffff;
+    --panel-2: #eef1f6;
+    --line: #d6dce6;
+    --text: #17202b;
+    --muted: #5b6879;
+    --accent: #1668d4;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ---------------------------------------------------------------- layout */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 18px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex-wrap: wrap;
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.nav {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.nav a {
+  padding: 6px 11px;
+  border-radius: 7px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.nav a:hover { background: var(--panel-2); color: var(--text); }
+.nav a.active { background: var(--accent); color: #fff; }
+
+.health {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+.health.ok { color: var(--ok); }
+.health.degraded { color: var(--warn); }
+.health.bad { color: var(--bad); }
+
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 22px 18px 60px;
+}
+
+h1 { font-size: 22px; margin: 4px 0 20px; font-weight: 650; }
+h2 { font-size: 16px; margin: 0 0 12px; font-weight: 600; }
+
+/* ---------------------------------------------------------------- panels */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.grid { display: grid; gap: 16px; }
+.grid.two { grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); }
+.grid.stats { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+
+.stat { background: var(--panel-2); border-radius: var(--radius); padding: 13px 15px; }
+.stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+.stat .value { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 3px; }
+.stat .value.small { font-size: 15px; font-weight: 500; word-break: break-word; }
+
+/* ---------------------------------------------------------------- forms */
+label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+
+input[type=text], input[type=number], select {
+  width: 100%;
+  padding: 9px 11px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+}
+
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.field { margin-bottom: 13px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.row > .field { flex: 1; min-width: 170px; margin-bottom: 0; }
+
+button {
+  padding: 9px 15px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger { color: var(--bad); }
+button.small { padding: 5px 10px; font-size: 13px; }
+
+.actions { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 14px; }
+
+.hint { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+.hint code { font-family: var(--mono); font-size: 12px; background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
+
+/* ---------------------------------------------------------------- tables */
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 0 10px 8px; font-weight: 600; }
+td { padding: 9px 10px; border-top: 1px solid var(--line); vertical-align: middle; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 13px; }
+.scroll { overflow-x: auto; }
+
+.empty { color: var(--muted); font-size: 14px; padding: 18px 2px; }
+
+/* ---------------------------------------------------------------- media */
+video, .stream {
+  width: 100%;
+  background: #000;
+  border-radius: var(--radius);
+  display: block;
+  /* No fixed aspect ratio: a phone held upright produces a portrait stream, and
+     forcing 4:3 would letterbox it into two thick black bars. min-height keeps the
+     panel from collapsing before the first frame arrives. */
+  min-height: 240px;
+  max-height: 72vh;
+  object-fit: contain;
+}
+
+.thumbs { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 12px; }
+.thumbs img { width: 58px; height: 58px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+
+.avatar { width: 42px; height: 42px; border-radius: 7px; object-fit: cover; background: var(--panel-2); }
+
+/* ---------------------------------------------------------------- badges */
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.badge.ok { color: var(--ok); }
+.badge.warn { color: var(--warn); }
+.badge.bad { color: var(--bad); }
+
+/* ---------------------------------------------------------------- logs */
+.logs { font-family: var(--mono); font-size: 12.5px; max-height: 62vh; overflow: auto; }
+.logline { display: flex; gap: 10px; padding: 3px 0; border-bottom: 1px solid var(--line); }
+.logline .ts { color: var(--muted); white-space: nowrap; }
+.logline .lvl { width: 62px; flex-shrink: 0; text-transform: uppercase; font-size: 11px; padding-top: 1px; }
+.logline .lvl.info { color: var(--accent); }
+.logline .lvl.warning { color: var(--warn); }
+.logline .lvl.error, .logline .lvl.critical { color: var(--bad); }
+.logline .msg { word-break: break-word; }
+.logline .ctx { color: var(--muted); }
+
+pre.config {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  overflow: auto;
+  margin: 0;
+  max-height: 60vh;
+}
+
+/* ---------------------------------------------------------------- toasts */
+.toasts {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+  max-width: min(420px, calc(100vw - 32px));
+}
+
+.toast {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 11px 14px;
+  font-size: 14px;
+  box-shadow: 0 6px 22px rgb(0 0 0 / 35%);
+}
+
+.toast.ok { border-left-color: var(--ok); }
+.toast.bad { border-left-color: var(--bad); }
+.toast .detail { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+
+/* ---------------------------------------------------------------- misc */
+.spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: -2px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.progress { height: 6px; background: var(--panel-2); border-radius: 99px; overflow: hidden; margin-top: 12px; }
+.progress > div { height: 100%; background: var(--accent); width: 0; transition: width 0.15s linear; }
+
+.warn-box {
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.warn-box strong { color: var(--warn); }
+
+@media (max-width: 620px) {
+  .nav a { padding: 6px 9px; font-size: 13px; }
+  h1 { font-size: 19px; }
+  .page { padding: 16px 12px 48px; }
+}

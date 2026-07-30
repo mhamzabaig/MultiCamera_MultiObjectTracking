@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid stats">
+  <div class="stat"><div class="label">Status</div><div class="value small" id="d-status">…</div></div>
+  <div class="stat"><div class="label">Device</div><div class="value small" id="d-device">…</div></div>
+  <div class="stat"><div class="label">People enrolled</div><div class="value" id="d-persons">—</div></div>
+  <div class="stat"><div class="label">Gallery vectors</div><div class="value" id="d-vectors">—</div></div>
+  <div class="stat"><div class="label">Cameras open</div><div class="value" id="d-cameras">—</div></div>
+  <div class="stat"><div class="label">Tracking</div><div class="value" id="d-tracking">—</div></div>
+  <div class="stat"><div class="label">People in view</div><div class="value" id="d-people">—</div></div>
+  <div class="stat"><div class="label">Uptime</div><div class="value small" id="d-uptime">—</div></div>
+</div>
+
+<div id="divergence" class="warn-box" hidden>
+  <strong>Gallery and index disagree.</strong>
+  The database holds <span id="div-db"></span> vectors and the search index holds
+  <span id="div-idx"></span>. The index is a derived cache, so rebuilding it from the
+  database is safe — do that on the <a href="/database">Database</a> page.
+</div>
+
+<div class="panel">
+  <h2>Cameras</h2>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Camera</th><th>Kind</th><th>State</th>
+          <th class="num">FPS</th><th class="num">Latency</th>
+          <th class="num">Delivered</th><th class="num">Dropped</th>
+          <th class="num">Reconnects</th><th>Tracking</th>
+        </tr>
+      </thead>
+      <tbody id="d-camera-rows"><tr><td colspan="9" class="empty">No cameras open.</td></tr></tbody>
+    </table>
+  </div>
+  <p class="hint">
+    Dropped frames are the ones nothing read before a newer frame replaced them.
+    A steady trickle is healthy — it means capture is outpacing the pipeline, which
+    is what keeps the picture fresh instead of letting a queue grow stale.
+  </p>
+</div>
+
+<div class="panel">
+  <h2>Recent activity</h2>
+  <div class="logs" id="d-logs"><div class="empty">Loading…</div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/dashboard.js"></script>
+{% endblock %}

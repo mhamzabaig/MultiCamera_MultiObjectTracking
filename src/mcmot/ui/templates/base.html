@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} · MC-MOT</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="icon" href="data:,">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">MC&#8209;MOT</a>
+    <nav class="nav">
+      {% for slug, href, label in pages %}
+      <a href="{{ href }}" class="{{ 'active' if slug == page else '' }}">{{ label }}</a>
+      {% endfor %}
+    </nav>
+    <span class="health" id="health-pill" title="System status">…</span>
+  </header>
+
+  <main class="page">
+    <h1>{{ title }}</h1>
+    {% block content %}{% endblock %}
+  </main>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <script src="/static/js/api.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

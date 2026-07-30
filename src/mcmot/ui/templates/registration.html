@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="insecure-warning" class="warn-box" hidden>
+  <strong>Camera unavailable on this address.</strong>
+  Browsers only grant camera access on <code>localhost</code> or over HTTPS, so
+  <code>http://&lt;lan-ip&gt;</code> cannot open a camera. Reach this page through the
+  HTTPS tunnel (see <code>scripts/tunnel.ps1</code>) or open it on the machine itself.
+  Everything else on this page still works.
+</div>
+
+<div class="grid two">
+  <div class="panel">
+    <h2>Camera</h2>
+    <video id="preview" autoplay playsinline muted></video>
+    <div class="row" style="margin-top:12px">
+      <div class="field">
+        <label for="device">Camera device</label>
+        <select id="device"></select>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="enable" class="primary">Enable camera</button>
+      <button id="switch" hidden>Switch camera</button>
+    </div>
+    <p class="hint">
+      On a phone, choose the rear camera for a full-body shot — the gallery wants your
+      whole body, not a close-up face.
+    </p>
+  </div>
+
+  <div class="panel">
+    <h2>Register a person</h2>
+    <div class="field">
+      <label for="name">Person name</label>
+      <input type="text" id="name" placeholder="e.g. Hamza" autocomplete="off" maxlength="120">
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="count">Frames to capture</label>
+        <input type="number" id="count" value="30" min="8" max="60">
+      </div>
+      <div class="field">
+        <label for="gap">Gap between frames (ms)</label>
+        <input type="number" id="gap" value="150" min="60" max="1000">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="capture" class="primary" disabled>Start capture</button>
+      <button id="retake" disabled>Retake</button>
+      <button id="save" disabled>Save</button>
+    </div>
+
+    <div class="progress"><div id="bar"></div></div>
+    <p class="hint" id="status">Enable the camera, enter a name, then capture.</p>
+
+    <div class="thumbs" id="thumbs"></div>
+    <p class="hint">
+      Move slowly while capturing — turn a little, step nearer and further. A gallery of
+      near-identical frames looks confident but only covers one angle.
+    </p>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Registration history</h2>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Name</th>
+          <th class="num">Embeddings</th>
+          <th>Registered</th>
+        </tr>
+      </thead>
+      <tbody id="history"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/registration.js"></script>
+{% endblock %}

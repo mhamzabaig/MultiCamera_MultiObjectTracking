@@ -255,6 +255,24 @@ Per 720p frame, single camera, RTX 4050:
 ≈ 20–28 ms/frame → 35–50 FPS headroom for one camera; comfortable 25 FPS on 2–3
 cameras. VRAM ≈ 2.5 GB of 6 GB.
 
+### Frontend — Jinja, one stylesheet, vanilla JS
+
+The plan was Bootstrap 5 + HTMX + Alpine.js. Building the pages showed the plan was
+wrong: what they actually need is `getUserMedia`, an `<img>` tag, and `fetch`, and no
+framework helps with any of those. Three CDN libraries would have bought styling and
+some attribute sugar in exchange for the app breaking when the network does — and this
+is a system whose whole premise is running on your own LAN, reached from a phone on a
+possibly-flaky tunnel. An unstyled dashboard because a CDN was unreachable is a worse
+outcome than writing 250 lines of CSS.
+
+So: server-rendered shells, one stylesheet, one small shared script (API client,
+error toasts, self-throttling poller), and a script per page. No build step, no
+`node_modules`, no CDN, works offline.
+
+Pages are **shells only** — every one fetches its data from the same REST API any
+other client would use. Rendering data server-side would create a second view of the
+same state that could silently disagree with the API.
+
 ## Cross-cutting concerns
 
 **Configuration.** Layered and deep-merged: code defaults → `config/default.yaml`
@@ -287,7 +305,7 @@ synthetic-video integration test asserting identity stability; locust for load;
 | Decision | Chosen | Alternatives considered |
 |---|---|---|
 | Python | 3.10 (installed on the target machine) | 3.12 (spec, needs install), 3.13 (ecosystem lag) |
-| Frontend | Jinja + Bootstrap + HTMX + Alpine | React/Vue/Next — rejected: second origin, Node toolchain, CORS on the hardest path |
+| Frontend | Jinja + own CSS + vanilla JS (see below) | Bootstrap/HTMX/Alpine — dropped at build time; React/Vue/Next — rejected: second origin, Node toolchain, CORS on the hardest path |
 | Phone access | Cloudflare Tunnel | Tailscale (lower latency, stays on LAN — documented fallback), self-signed (fragile on Android), plain LAN (breaks `getUserMedia`) |
 | Phone as tracking camera | IP Webcam app, server pulls | Browser upload — rejected: second ingestion path, no reconnect, video through the tunnel |
 | Video to browser | MJPEG | WebRTC via aiortc — deferred behind the same sink interface |

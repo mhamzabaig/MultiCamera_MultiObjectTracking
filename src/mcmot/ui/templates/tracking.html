@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="panel">
+  <div class="row">
+    <div class="field">
+      <label for="camera">Camera</label>
+      <select id="camera"></select>
+    </div>
+    <div class="field">
+      <label for="source">Or add a camera by URL</label>
+      <input type="text" id="source" placeholder="0  ·  rtsp://…  ·  http://192.168.1.42:8080/video">
+    </div>
+    <div class="field" style="max-width:180px">
+      <label for="new-id">New camera id</label>
+      <input type="text" id="new-id" placeholder="phone">
+    </div>
+    <button id="add">Add camera</button>
+  </div>
+  <div class="actions">
+    <button id="start" class="primary" disabled>Start tracking</button>
+    <button id="stop" disabled>Stop tracking</button>
+  </div>
+  <p class="hint" id="camera-hint">Add or select a camera to begin.</p>
+</div>
+
+<div class="grid stats">
+  <div class="stat"><div class="label">FPS</div><div class="value" id="m-fps">—</div></div>
+  <div class="stat"><div class="label">Latency</div><div class="value" id="m-latency">—</div></div>
+  <div class="stat"><div class="label">People</div><div class="value" id="m-people">—</div></div>
+  <div class="stat"><div class="label">Identified</div><div class="value" id="m-identified">—</div></div>
+  <div class="stat"><div class="label">Camera</div><div class="value small" id="m-state">—</div></div>
+</div>
+
+<div class="panel">
+  <h2>Live view</h2>
+  <img id="stream" class="stream" alt="Live annotated video">
+  <p class="hint" id="stream-hint">Not streaming.</p>
+</div>
+
+<div class="panel">
+  <h2>Pipeline detail</h2>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Camera</th><th>State</th>
+          <th class="num">FPS</th><th class="num">Latency</th>
+          <th class="num">Detect</th><th class="num">ReID</th>
+          <th class="num">People</th><th class="num">Named</th>
+          <th class="num">Frames</th><th class="num">Stale</th>
+          <th class="num">Embeds</th>
+        </tr>
+      </thead>
+      <tbody id="pipelines"><tr><td colspan="11" class="empty">No pipelines running.</td></tr></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/tracking.js"></script>
+{% endblock %}

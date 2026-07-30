@@ -16,7 +16,7 @@ from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from mcmot.api.errors import register_exception_handlers
 from mcmot.api.middleware import RequestContextMiddleware
@@ -24,6 +24,8 @@ from mcmot.api.routers import all_routers
 from mcmot.container import Container
 from mcmot.core.logging import get_logger
 from mcmot.core.settings import Settings, load_settings
+from mcmot.ui import STATIC_DIR
+from mcmot.ui import router as ui_router
 
 __all__ = ["cli", "create_app"]
 
@@ -90,17 +92,11 @@ def create_app(
     for router in all_routers():
         app.include_router(router)
 
-    @app.get("/", include_in_schema=False)
-    async def root() -> JSONResponse:
-        """Service descriptor. Phase 10 replaces this with the dashboard page."""
-        return JSONResponse(
-            {
-                "name": "mcmot",
-                "version": config.version,
-                "docs": "/docs" if config.api.docs_enabled else None,
-                "health": "/api/system/health",
-            }
-        )
+    # The UI is served from this same origin as the API and the video stream, so one
+    # certificate covers all three. A separate frontend origin would need CORS on the
+    # hardest path in the system — a phone's camera over a tunnel.
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    app.include_router(ui_router)
 
     return app
 
