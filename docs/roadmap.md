@@ -16,8 +16,8 @@ begins.
 | 8 | Pipeline | ✅ **done** | `PipelineWorker`, frame-skip policy, state retirement, annotator, metrics, MJPEG sink |
 | 9 | API | ✅ **done** | Persons, cameras, tracking routers; settings and logs endpoints; registration service; MJPEG endpoint |
 | 10 | Frontend | ✅ **done** | Seven pages, own stylesheet, vanilla JS, browser capture, MJPEG viewer |
-| 11 | Mobile / HTTPS | next | Cloudflare Tunnel scripts, phone-as-camera setup, threshold calibration tooling |
-| 12 | Hardening | | Full unit / integration / API / load suites, benchmarks, Docker, deployment docs |
+| 11 | Mobile / HTTPS | ✅ **done** | Cloudflare Tunnel script, phone-as-camera guide, threshold calibration tooling |
+| 12 | Hardening | next | Load suites, benchmarks, Docker, deployment docs |
 
 Phases 1–2 are load-bearing: every later phase plugs into interfaces defined
 there.
@@ -454,6 +454,58 @@ tens of thousands of milliseconds old, and `57187` under a heading of "Latency" 
 as a glitch rather than as a dead stream.
 
 Verified: `pytest` 416 passed (42 new) · `ruff` clean · `mypy --strict` clean.
+
+## Phase 11 — what was delivered
+
+| Module | Contents |
+|---|---|
+| `scripts/tunnel.ps1` | Fetches `cloudflared`, checks the origin is up, runs a quick tunnel |
+| `scripts/calibrate.py` | Measures identity thresholds against your own two cameras |
+| `docs/mobile.md` | Both phone paths, the access-method comparison, calibration workflow, troubleshooting |
+
+**The distinction that saves the most wasted effort.** "Use my phone as a camera" is
+two different things with different requirements:
+
+| | What the phone does | Direction | Needs HTTPS? |
+|---|---|---|---|
+| Registration | its *browser* captures | phone → laptop | **yes** |
+| Tracking | an app serves a stream | laptop → phone | **no** |
+
+`getUserMedia()` is only available in a secure context, so registration from
+`http://192.168.1.x` is impossible whatever permissions are granted. Tracking has no
+such constraint because the server dials out. Tracking a phone camera therefore needs
+no tunnel, no certificate, and nothing installed on the laptop — which is worth
+knowing before setting any of it up.
+
+Cloudflare Tunnel chosen over Tailscale, ngrok, LocalTunnel, and self-signed
+certificates; the full comparison with latency, bandwidth, security, setup, and
+limits is in [mobile.md](mobile.md#access-methods-compared). The recommended pattern
+is a hybrid: **register over the tunnel, watch tracking over the LAN**, since
+continuous video has no reason to cross the internet to reach a laptop in the same
+room.
+
+**Calibration is the phase's real deliverable.** `tau_accept = 0.55` was derived from
+crops of a single photo, augmented to simulate a second camera. The real question —
+does a gallery built from a phone at chest height recognise the same person on a
+different camera in different light — cannot be answered by that, and published ReID
+benchmarks do not transfer. `calibrate.py` takes per-person `enrol/` and `verify/`
+folders and reports rank-1 accuracy, both score distributions, a sweep over both
+thresholds, and a recommendation. Strangers are free: every other person's `verify`
+images are strangers to this person's gallery.
+
+Verified on a synthetic two-view set built from `bus.jpg` (4 people, second "camera"
+downscaled, brightened, and mirrored): 3 people usable, 24 probes, **rank-1 100%**,
+same-person 0.968–0.979, different-person 0.461–0.511, separation **+0.481**.
+
+**A recommendation that was actively bad advice, caught by running it.** The first
+version maximised recall. But when the distributions separate cleanly, *every*
+threshold below the stranger scores achieves 100% recall with zero false accepts, and
+`max()` returns the first — so it recommended `tau_accept: 0.3` for data whose
+strangers scored up to 0.511. That is not a conservative default, it is a threshold
+with **no headroom at all** for a stranger scoring higher than anyone in the sample,
+and following it would have made the system worse than the shipped default. It now
+places the threshold at the midpoint of the observed gap — 0.75 on that data — the
+point furthest from both failure modes.
 
 ## Deliberate deferrals
 

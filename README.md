@@ -13,18 +13,20 @@ Video stream → YOLOv11 → ByteTrack → crop → OSNet ReID → Identity Serv
 
 ## Status
 
-**Phases 1–7 of 12 complete — recognition works end to end.** Foundation
-(configuration, structured logging, exception hierarchy, device management, domain
-contracts, DI container, API skeleton), storage (SQLite, `PersonRepository`, FAISS
-gallery index, image store), detection (YOLOv11n on CUDA — 72 FPS at 720p on an RTX
-4050), tracking (ByteTrack — 57 FPS detect-and-track end to end), re-identification
-(OSNet-AIN — same person 0.97 mean, different people 0.43), the identity service
-(enrolment, dual-threshold gating, per-track temporal voting), and cameras (webcam,
-RTSP, HTTP/MJPEG and file sources with latest-frame-wins capture and reconnection).
+**Phases 1–11 of 12 complete — the system is usable end to end from a browser.**
+Foundation, storage, detection (YOLOv11n on CUDA), tracking (ByteTrack),
+re-identification (OSNet-AIN), the identity service (dual-threshold gating and
+per-track temporal voting), cameras (webcam, RTSP, HTTP/MJPEG, file), the live
+tracking pipeline, a 20-endpoint REST API, a seven-page web UI, and the mobile
+access path.
 
-You can now enrol a person and have them recognised by name, with strangers
-correctly reported as Unknown, from any supported camera source. The live pipeline
-and the web UI arrive in phases 8–10; see [docs/roadmap.md](docs/roadmap.md).
+Open the dashboard, register someone from a phone camera, point a camera at a room,
+and watch names appear over the people it recognises — with strangers reported as
+Unknown rather than mislabelled. Measured on an RTX 4050: **18 FPS at 55 ms per
+frame**, 0.23 embeddings per frame against 4.0 for naive per-person-per-frame ReID.
+
+Phase 12 (load tests, benchmarks, Docker, deployment docs) remains; see
+[docs/roadmap.md](docs/roadmap.md).
 
 ## Requirements
 
@@ -55,11 +57,26 @@ python -m mcmot.main                   # http://localhost:8000
 python -m mcmot.main --reload          # auto-reload during development
 ```
 
-| Endpoint | Purpose |
+Then open <http://localhost:8000>.
+
+| Page | Purpose |
 |---|---|
-| `/api/system/health` | Status, resolved device, effective configuration |
-| `/api/system/version` | Build identity (cheap, for uptime polling) |
+| `/` | Dashboard — health, gallery, cameras, pipelines, recent activity |
+| `/registration` | Enrol a person using this device's camera |
+| `/tracking` | Live annotated video with per-camera metrics |
+| `/database` | Browse, rename, delete; rebuild the search index |
+| `/cameras` | Add and remove cameras, watch connection state |
+| `/settings` `/logs` | Active configuration; structured log tail |
 | `/docs` | Interactive OpenAPI documentation |
+
+**To use your phone**, see [docs/mobile.md](docs/mobile.md). In short: tracking a
+phone camera needs nothing special, but *registering* from a phone browser needs
+HTTPS, because `getUserMedia` is blocked on a plain LAN address:
+
+```powershell
+.\scripts	unnel.ps1 -Install     # once
+.\scripts	unnel.ps1              # prints an https:// URL for the phone
+```
 
 ## Configuration
 
@@ -108,7 +125,10 @@ mypy
 | `src/mcmot/identity/` | Enrolment, gallery search, thresholds, per-track voting |
 | `src/mcmot/camera/` | Source parsing, capture threads, reconnection, camera registry |
 | `src/mcmot/container.py` | Composition root — wires every layer together |
+| `src/mcmot/pipeline/` | Per-camera worker, annotator, metrics, MJPEG sink |
+| `src/mcmot/services/` | Use cases spanning layers (registration) |
 | `src/mcmot/api/` | Routers, schemas, dependencies, middleware, error mapping |
+| `src/mcmot/ui/` | Page routes, Jinja templates, stylesheet, browser scripts |
 | `config/` | `default.yaml` (committed) and `local.yaml` (yours) |
 | `data/` `models/` `logs/` | Generated at runtime, never committed |
 | `docs/` | Architecture, roadmap, decisions |
@@ -117,7 +137,10 @@ mypy
 ## Documentation
 
 * [docs/architecture.md](docs/architecture.md) — design and the reasoning behind it
-* [docs/roadmap.md](docs/roadmap.md) — the 12 phases and their order
+* [docs/roadmap.md](docs/roadmap.md) — the 12 phases, what each delivered, and every
+  defect found while verifying them
+* [docs/mobile.md](docs/mobile.md) — using a phone, tunnel comparison, threshold
+  calibration
 * [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md) — dependencies and their licences
 
 ## Licensing note
