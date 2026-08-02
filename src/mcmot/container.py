@@ -151,7 +151,11 @@ class Container:
         must agree on what a person crop is, or the gallery is built from one
         distribution and queried with another.
         """
-        return RegistrationService(detector=self.detector, identity=self.identity_service)
+        return RegistrationService(
+            detector=self.detector,
+            identity=self.identity_service,
+            quality=self.quality_gate,
+        )
 
     @cached_property
     def camera_manager(self) -> CameraManager:

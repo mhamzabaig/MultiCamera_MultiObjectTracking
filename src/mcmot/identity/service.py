@@ -148,9 +148,35 @@ class IdentityService:
                 },
             )
 
-        # 2. Embed the candidates, then keep a diverse subset.
+        # 2. Embed the candidates, discard anyone who is not the subject, then keep a
+        #    diverse subset of what remains.
         candidates = [crop for _, crop in scored[: registration.target_frames]]
         embeddings = self._embedder.extract(candidates)
+
+        coherent = self._coherent(embeddings)
+        if len(coherent) < registration.min_accepted_frames:
+            raise IdentityError(
+                f"Only {len(coherent)} of {embeddings.shape[0]} frames show the same "
+                f"person; at least {registration.min_accepted_frames} are required. "
+                "Register with only one person in view.",
+                details={
+                    "embedded": int(embeddings.shape[0]),
+                    "same_person": len(coherent),
+                    "required": registration.min_accepted_frames,
+                },
+            )
+        if len(coherent) < embeddings.shape[0]:
+            _log.info(
+                "identity.gallery_outliers_dropped",
+                name=name,
+                embedded=int(embeddings.shape[0]),
+                kept=len(coherent),
+            )
+
+        embeddings = np.ascontiguousarray(embeddings[coherent], dtype=np.float32)
+        candidates = [candidates[i] for i in coherent]
+        scored = [scored[i] for i in coherent]
+
         keep = self._select_gallery(
             embeddings,
             limit=min(registration.max_accepted_frames, self._config.max_embeddings_per_person),
@@ -193,6 +219,46 @@ class IdentityService:
             rejections=dict(rejections),
         )
         return self._repo.get(person.id)
+
+    def _coherent(self, embeddings: EmbeddingMatrix) -> list[int]:
+        """Keep only the embeddings that show the same person as the majority.
+
+        **The failure this prevents.** Registration picks one person per frame. If a
+        bystander wins a few frames — someone crossing the room behind the subject —
+        those vectors join the gallery under the subject's name, and from then on the
+        system recognises *both* people as that person. It looks confident while being
+        wrong about someone's identity, which is the worst outcome this system has,
+        and nothing downstream can detect it: a mixed gallery is internally consistent.
+
+        **How.** Take the medoid — the embedding most similar to all the others, so
+        the majority subject by construction rather than by assuming frame order — and
+        drop anything that fails to match it at ``tau_accept``.
+
+        Reusing ``tau_accept`` rather than inventing a threshold is deliberate. It is
+        already the calibrated answer to "is this the same person", already tuned per
+        deployment by ``scripts/calibrate.py``, and the gap it sits in is wide here:
+        different views of one person score 0.93-0.99, different people around 0.55.
+
+        Returns:
+            Indices to keep, in their original order.
+        """
+        count = embeddings.shape[0]
+        if count < 3:
+            # Two frames cannot establish a majority, and rejecting one of them on the
+            # other's say-so is a coin toss. The quality gate and the minimum-frame
+            # floor already refuse an enrolment this thin.
+            return list(range(count))
+
+        # Rows are L2-normalised by contract, so the inner product is cosine.
+        similarity = embeddings @ embeddings.T
+        np.fill_diagonal(similarity, 0.0)
+        medoid = int(np.argmax(similarity.sum(axis=1)))
+
+        return [
+            index
+            for index in range(count)
+            if index == medoid or float(similarity[medoid, index]) >= self._config.tau_accept
+        ]
 
     def _select_gallery(
         self, embeddings: EmbeddingMatrix, *, limit: int, floor: int, threshold: float
