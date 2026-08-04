@@ -75,9 +75,9 @@ class Annotator:
             lines.append(f"{verdict.score:.2f}")
 
         # Label above the box, or inside it when the box touches the top edge.
-        scale, thickness = 0.55, 1
+        scale, thickness = 1.5, 4
         sizes = [cv2.getTextSize(line, _FONT, scale, thickness)[0] for line in lines]
-        heights = [size[1] + 6 for size in sizes]
+        heights = [size[1] + 10 for size in sizes]
         block = sum(heights)
         top = y1 - block - 4 if y1 - block - 4 > 0 else y1 + 4
 
@@ -92,7 +92,7 @@ class Annotator:
             y += height
             # Drawn twice: a dark offset copy underneath keeps text legible against
             # both a white shirt and a dark doorway.
-            cv2.putText(canvas, line, (left + 1, y + 1), _FONT, scale, _SHADOW, thickness + 1)
+            cv2.putText(canvas, line, (left + 2, y + 2), _FONT, scale, _SHADOW, thickness + 2)
             cv2.putText(canvas, line, (left, y), _FONT, scale, colour, thickness)
 
     @staticmethod
